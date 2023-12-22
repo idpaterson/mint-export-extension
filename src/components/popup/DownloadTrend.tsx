@@ -5,31 +5,24 @@ import Text from '@root/src/components/Text';
 import DefaultButton from '@root/src/components/button/DefaultButton';
 
 import useStorage from '@root/src/shared/hooks/useStorage';
-import accountStorage, { AccountsDownloadStatus } from '@root/src/shared/storages/accountStorage';
-import pluralize from 'pluralize';
 import { useMemo } from 'react';
+import trendStorage, { TrendDownloadStatus } from '../../shared/storages/trendStorage';
 
-const DownloadBalances = () => {
-  const accountStateValue = useStorage(accountStorage);
-  const isSuccess = accountStateValue.status === AccountsDownloadStatus.Success;
+const DownloadTrend = () => {
+  const trendStateValue = useStorage(trendStorage);
+  const isSuccess = trendStateValue.status === TrendDownloadStatus.Success;
 
   const content = useMemo(() => {
-    const { successCount, errorCount, progress } = accountStateValue ?? {};
-    const { totalAccounts, completedAccounts, completePercentage = 0 } = progress ?? {};
+    const { progress } = trendStateValue ?? {};
+    const { completePercentage = 0 } = progress ?? {};
 
     if (isSuccess) {
       return (
         <div className="flex flex-col gap-3">
           <Text type="header">Download complete!</Text>
           <Text className="font-normal">
-            Balance history for {successCount} {pluralize('account', successCount)} downloaded to
-            your computer.
+            Balance history for the trend downloaded to your computer.
           </Text>
-          {errorCount > 0 && (
-            <Text className="font-normal">
-              {pluralize('account', errorCount, true)} failed to download.
-            </Text>
-          )}
           <DefaultButton href="https://help.monarchmoney.com/hc/en-us/articles/14882425704212-Upload-account-balance-history">
             Import into Monarch
           </DefaultButton>
@@ -39,16 +32,11 @@ const DownloadBalances = () => {
       return (
         <div className="flex flex-col gap-3">
           <Text className="text-current text-textLight">
-            Downloading balance history for {totalAccounts} {pluralize('account', totalAccounts)}.
-            This may take a minute.
+            Downloading balance history for the trend. This may take a minute.
           </Text>
-          {totalAccounts > 0 && completePercentage > 0 && (
+          {completePercentage > 0 && (
             <div className="flex flex-col gap-3">
               <Progress percentage={completePercentage} />
-              <Text className="text-textLight">
-                {completedAccounts} of {totalAccounts} {pluralize('accounts', totalAccounts)}{' '}
-                complete
-              </Text>
             </div>
           )}
         </div>
@@ -56,13 +44,14 @@ const DownloadBalances = () => {
     } else {
       return <Text>Getting your balance information...</Text>;
     }
-  }, [isSuccess, accountStateValue]);
+  }, [isSuccess, trendStateValue]);
 
-  if (accountStateValue.status === AccountsDownloadStatus.Error) {
+  if (trendStateValue.status === TrendDownloadStatus.Error) {
     return (
       <ErrorBoundary>
-        Sorry, there was an error downloading your balances. We&apos;ve been notified and are
-        working on a fix.
+        Sorry, there was an error downloading the trend balances. Note that daily trend data is less
+        likely to be available for trends that include very old transactions across a large number
+        of accounts. Please try again later or refine the trend.
       </ErrorBoundary>
     );
   }
@@ -76,4 +65,4 @@ const DownloadBalances = () => {
   );
 };
 
-export default DownloadBalances;
+export default DownloadTrend;

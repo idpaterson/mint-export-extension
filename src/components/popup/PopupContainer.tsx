@@ -14,6 +14,9 @@ import OtherResources from '@root/src/components/popup/OtherResources';
 import { fetchAccounts } from '@root/src/shared/lib/accounts';
 import DownloadBalances from '@root/src/components/popup/DownloadBalances';
 import accountStorage, { AccountsDownloadStatus } from '@root/src/shared/storages/accountStorage';
+import DownloadTrend from './DownloadTrend';
+import { isSupportedTrendReport } from '../../shared/lib/trends';
+import trendStorage, { TrendDownloadStatus } from '../../shared/storages/trendStorage';
 
 interface Page {
   title: string;
@@ -29,12 +32,26 @@ const PAGE_TO_COMPONENT: Record<PageKey, Page> = {
     title: 'Mint Account Balance History',
     component: DownloadBalances,
   },
+  downloadTrend: {
+    title: 'Current Trend Balance History',
+    component: DownloadTrend,
+  },
 };
 
 const PopupContainer = ({ children }: React.PropsWithChildren) => {
   const { currentPage, downloadTransactionsStatus } = useStorage(stateStorage);
+  const { trend, status: trendStatus } = useStorage(trendStorage);
   const { status, userData } = usePopupContext();
   const sendMessage = useMessageSender();
+  let showPage = currentPage;
+
+  // Trend download is likely to be completed multiple times in a row; do not require the user to
+  // click the back arrow after every download if the popup was closed.
+  if (currentPage === 'downloadTrend' && trendStatus === TrendDownloadStatus.Success) {
+    showPage = undefined;
+    stateStorage.patch({ currentPage: undefined });
+    trendStorage.patch({ status: TrendDownloadStatus.Idle });
+  }
 
   const onDownloadTransactions = useCallback(async () => {
     await stateStorage.patch({
@@ -84,6 +101,15 @@ const PopupContainer = ({ children }: React.PropsWithChildren) => {
     await sendMessage({ action: Action.DownloadAllAccountBalances });
   }, [sendMessage]);
 
+  const onDownloadTrend = useCallback(async () => {
+    await stateStorage.patch({
+      currentPage: 'downloadTrend',
+      downloadTransactionsStatus: undefined,
+      totalTransactionsCount: undefined,
+    });
+    await sendMessage({ action: Action.DownloadTrendBalances });
+  }, [sendMessage]);
+
   const content = useMemo(() => {
     switch (status) {
       case ResponseStatus.Loading:
@@ -115,6 +141,11 @@ const PopupContainer = ({ children }: React.PropsWithChildren) => {
             <DefaultButton onClick={onDownloadAccountBalanceHistory}>
               Download Mint account balance history
             </DefaultButton>
+            <DefaultButton
+              onClick={onDownloadTrend}
+              disabled={!isSupportedTrendReport(trend?.reportType)}>
+              Download current trend daily balances
+            </DefaultButton>
           </div>
         );
       default:
@@ -124,17 +155,23 @@ const PopupContainer = ({ children }: React.PropsWithChildren) => {
           </div>
         );
     }
-  }, [status, userData?.userName, onDownloadTransactions, onDownloadAccountBalanceHistory]);
+  }, [
+    status,
+    userData?.userName,
+    trend?.reportType,
+    onDownloadTransactions,
+    onDownloadAccountBalanceHistory,
+  ]);
 
-  const { component: PageComponent, title: pageTitle } = PAGE_TO_COMPONENT[currentPage] ?? {};
+  const { component: PageComponent, title: pageTitle } = PAGE_TO_COMPONENT[showPage] ?? {};
 
   // 💀
   const showBackArrow =
-    currentPage === 'downloadTransactions'
+    showPage === 'downloadTransactions'
       ? downloadTransactionsStatus !== ResponseStatus.Loading
-      : currentPage === 'downloadBalances'
+      : showPage === 'downloadBalances'
       ? downloadTransactionsStatus !== ResponseStatus.Loading
-      : !!currentPage; // there's a page that's not index (index is undefined)
+      : !!showPage; // there's a page that's not index (index is undefined)
 
   return (
     <div className="flex flex-col">
